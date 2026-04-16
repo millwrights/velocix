@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en" data-color-mode="dark" data-dark-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Velocix - Pipeline Dashboard</title>
+<style>
+  :root {
+    --color-canvas-default: #0d1117;
+    --color-canvas-subtle: #161b22;
+    --color-canvas-inset: #010409;
+    --color-border-default: #30363d;
+    --color-border-muted: #21262d;
+    --color-fg-default: #e6edf3;
+    --color-fg-muted: #8b949e;
+    --color-fg-subtle: #6e7681;
+    --color-accent-fg: #58a6ff;
+    --color-accent-emphasis: #1f6feb;
+    --color-success-fg: #3fb950;
+    --color-success-emphasis: #238636;
+    --color-danger-fg: #f85149;
+    --color-danger-emphasis: #da3633;
+    --color-attention-fg: #d29922;
+    --color-attention-emphasis: #9e6a03;
+    --color-done-fg: #a371f7;
+    --color-neutral-muted: rgba(110,118,129,0.4);
+    --color-btn-bg: #21262d;
+    --color-btn-border: rgba(240,246,252,0.1);
+    --color-btn-hover-bg: #30363d;
+    --color-header-bg: #161b22;
+    --color-counter-bg: rgba(110,118,129,0.4);
+    --sidebar-width: 280px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+  }
+
+  /* Header */
+  .AppHeader {
+    background: var(--color-header-bg);
+    border-bottom: 1px solid var(--color-border-default);
+    padding: 0 16px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+  }
+  .AppHeader-logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-fg-default);
+    font-weight: 600;
+    font-size: 16px;
+    text-decoration: none;
+  }
+  .AppHeader-logo svg { fill: var(--color-fg-default); }
+  .AppHeader-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--color-fg-muted);
+  }
+  .live-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-success-fg);
+    display: inline-block;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Layout */
+  .Layout {
+    display: flex;
+    margin-top: 48px;
+    min-height: calc(100vh - 48px);
+  }
+
+  /* Left Sidebar */
+  .Sidebar {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    border-right: 1px solid var(--color-border-default);
+    background: var(--color-canvas-subtle);
+    padding: 0;
+    overflow-y: auto;
+    position: fixed;
+    top: 48px;
+    bottom: 0;
+    left: 0;
+  }
+  .Sidebar-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-border-default);
+  }
+  .Sidebar-heading {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .Sidebar-heading .clear-btn {
+    font-size: 11px;
+    color: var(--color-accent-fg);
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 400;
+    background: none;
+    border: none;
+    display: none;
+  }
+  .Sidebar-heading .clear-btn.visible { display: inline; }
+  .Sidebar-heading .clear-btn:hover { text-decoration: underline; }
+
+  /* Org switcher dropdown */
+  .OrgSwitcher { padding: 12px 16px; border-bottom: 1px solid var(--color-border-default); }
+  .org-select {
+    width: 100%;
+    appearance: none;
+    padding: 8px 32px 8px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8.825c-.2 0-.4-.1-.5-.2l-3.3-3.3c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0L6 6.925l2.7-2.7c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1l-3.3 3.3c-.1.1-.3.2-.5.2z'/%3E%3C/svg%3E") no-repeat right 10px center;
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .org-select:hover { border-color: var(--color-accent-fg); }
+  .org-select:focus { border-color: var(--color-accent-fg); outline: none; box-shadow: 0 0 0 3px rgba(31,111,235,0.3); }
+
+  /* Filter list items with checkboxes */
+  .FilterList { list-style: none; }
+  .FilterList-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-fg-muted);
+    transition: background 0.1s;
+    gap: 8px;
+  }
+  .FilterList-item:hover { background: var(--color-btn-hover-bg); color: var(--color-fg-default); }
+  .FilterList-item.selected { background: rgba(56,139,253,0.15); color: var(--color-accent-fg); font-weight: 500; }
+  .FilterList-item .count {
+    font-size: 12px;
+    padding: 0 6px;
+    line-height: 18px;
+    border-radius: 10px;
+    background: var(--color-counter-bg);
+    min-width: 20px;
+    text-align: center;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .FilterList-item .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .FilterList-item .check {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid var(--color-border-default);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: transparent;
+    background: var(--color-canvas-default);
+    transition: all 0.1s;
+  }
+  .FilterList-item.selected .check {
+    background: var(--color-accent-emphasis);
+    border-color: var(--color-accent-emphasis);
+    color: #fff;
+  }
+  .FilterList-item .label-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Search in sidebar */
+  .Sidebar-search {
+    position: relative;
+    margin-bottom: 8px;
+  }
+  .Sidebar-search input {
+    width: 100%;
+    padding: 5px 10px 5px 28px;
+    font-size: 12px;
+    line-height: 20px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    outline: none;
+    font-family: inherit;
+  }
+  .Sidebar-search input:focus { border-color: var(--color-accent-fg); box-shadow: 0 0 0 3px rgba(31,111,235,0.3); }
+  .Sidebar-search .icon {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-fg-subtle);
+    display: flex;
+  }
+
+  /* Main content */
+  .Main {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    padding: 24px 32px;
+    min-width: 0;
+  }
+
+  /* Page heading */
+  .page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .page-heading h2 { font-size: 20px; font-weight: 400; }
+  .page-heading .active-org-name { color: var(--color-accent-fg); font-weight: 600; }
+
+  /* Status tabs */
+  .UnderlineNav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--color-border-default);
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  .UnderlineNav-item {
+    padding: 8px 16px;
+    font-size: 14px;
+    color: var(--color-fg-muted);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: border-color 0.1s;
+  }
+  .UnderlineNav-item:hover { color: var(--color-fg-default); border-bottom-color: var(--color-border-muted); }
+  .UnderlineNav-item.selected { color: var(--color-fg-default); font-weight: 600; border-bottom-color: #f78166; }
+  .Counter {
+    display: inline-block;
+    padding: 0 6px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 18px;
+    border-radius: 10px;
+    background: var(--color-counter-bg);
+    color: var(--color-fg-default);
+    min-width: 20px;
+    text-align: center;
+  }
+
+  /* Main search bar */
+  .main-search {
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .main-search input {
+    width: 100%;
+    padding: 7px 12px 7px 36px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    outline: none;
+    font-family: inherit;
+  }
+  .main-search input:focus { border-color: var(--color-accent-fg); box-shadow: 0 0 0 3px rgba(31,111,235,0.3); }
+  .main-search .icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--color-fg-muted); display: flex; }
+
+  /* Active filters bar */
+  .active-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 0;
+  }
+  .active-filters:empty { display: none; }
+  .filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 12px;
+    border-radius: 2em;
+    border: 1px solid var(--color-border-default);
+    background: var(--color-btn-bg);
+    color: var(--color-fg-default);
+  }
+  .filter-tag .remove {
+    cursor: pointer;
+    color: var(--color-fg-muted);
+    font-size: 14px;
+    line-height: 1;
+    margin-left: 2px;
+  }
+  .filter-tag .remove:hover { color: var(--color-danger-fg); }
+
+  /* Run list */
+  .Box {
+    border: 1px solid var(--color-border-default);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .Box-header {
+    padding: 8px 16px;
+    background: var(--color-canvas-subtle);
+    border-bottom: 1px solid var(--color-border-default);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    color: var(--color-fg-muted);
+  }
+  .Box-row {
+    display: flex;
+    align-items: flex-start;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-border-muted);
+    gap: 12px;
+    transition: background 0.05s;
+  }
+  .Box-row:last-child { border-bottom: none; }
+  .Box-row:hover { background: var(--color-canvas-subtle); }
+  .Box-row .status-icon { flex-shrink: 0; width: 20px; height: 20px; margin-top: 2px; }
+  .Box-row .status-icon svg { width: 20px; height: 20px; }
+  .Box-row .run-info { flex: 1; min-width: 0; }
+  .Box-row .run-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-fg-default);
+    text-decoration: none;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .Box-row .run-title:hover { color: var(--color-accent-fg); }
+  .Box-row .run-meta {
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .Box-row .run-meta a { color: var(--color-fg-muted); text-decoration: none; }
+  .Box-row .run-meta a:hover { color: var(--color-accent-fg); text-decoration: underline; }
+  .Box-row .run-details {
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 12px;
+    color: var(--color-fg-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 140px;
+  }
+
+  .branch-name {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 6px;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    line-height: 18px;
+    color: var(--color-accent-fg);
+    background: rgba(56,139,253,0.15);
+    border-radius: 6px;
+    text-decoration: none;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .branch-name:hover { text-decoration: underline; }
+
+  .avatar {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--color-neutral-muted);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--color-fg-muted); text-decoration: none;
+  }
+
+  .blankslate {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--color-fg-muted);
+  }
+  .blankslate svg { margin-bottom: 12px; color: var(--color-fg-subtle); }
+  .blankslate h3 { font-size: 20px; margin-bottom: 4px; color: var(--color-fg-default); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .Sidebar { width: 220px; min-width: 220px; }
+    .Main { margin-left: 220px; padding: 16px; }
+    :root { --sidebar-width: 220px; }
+  }
+  @media (max-width: 640px) {
+    .Sidebar { display: none; }
+    .Main { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="AppHeader">
+  <a class="AppHeader-logo" href="/">
+    <svg height="24" viewBox="0 0 24 24" width="24"><path d="M3 3h7l2 3h9v13H3V3zm2 2v12h14V8h-8l-2-3H5z"/><circle cx="12" cy="13" r="1.5"/></svg>
+    Velocix
+  </a>
+  <div class="AppHeader-meta">
+    <span class="live-dot"></span>
+    Live &middot; <span id="last-update">--</span>
+  </div>
+</header>
+
+<div class="Layout">
+
+  <!-- Left Sidebar -->
+  <aside class="Sidebar">
+
+    <!-- Org Switcher (dropdown) -->
+    <div class="OrgSwitcher">
+      <div class="Sidebar-heading">Organization</div>
+      <select class="org-select" id="org-select" onchange="switchOrg(this.value)"></select>
+    </div>
+
+    <!-- Status Filter (multi-select) -->
+    <div class="Sidebar-section">
+      <div class="Sidebar-heading">
+        Status
+        <button class="clear-btn" id="clear-status" onclick="clearFilter('status')">Clear</button>
+      </div>
+      <ul class="FilterList" id="status-filter-list">
+        <li class="FilterList-item" data-status="success" onclick="toggleStatus('success')">
+          <span class="check">&#10003;</span>
+          <span><span class="status-dot" style="background:var(--color-success-fg)"></span>Success</span>
+          <span class="count" id="sidebar-success">0</span>
+        </li>
+        <li class="FilterList-item" data-status="failure" onclick="toggleStatus('failure')">
+          <span class="check">&#10003;</span>
+          <span><span class="status-dot" style="background:var(--color-danger-fg)"></span>Failure</span>
+          <span class="count" id="sidebar-failure">0</span>
+        </li>
+        <li class="FilterList-item" data-status="in_progress" onclick="toggleStatus('in_progress')">
+          <span class="check">&#10003;</span>
+          <span><span class="status-dot" style="background:var(--color-attention-fg)"></span>In progress</span>
+          <span class="count" id="sidebar-running">0</span>
+        </li>
+        <li class="FilterList-item" data-status="queued" onclick="toggleStatus('queued')">
+          <span class="check">&#10003;</span>
+          <span><span class="status-dot" style="background:var(--color-fg-subtle)"></span>Queued</span>
+          <span class="count" id="sidebar-queued">0</span>
+        </li>
+        <li class="FilterList-item" data-status="cancelled" onclick="toggleStatus('cancelled')">
+          <span class="check">&#10003;</span>
+          <span><span class="status-dot" style="background:var(--color-fg-subtle)"></span>Cancelled</span>
+          <span class="count" id="sidebar-cancelled">0</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Repository Filter (multi-select) -->
+    <div class="Sidebar-section">
+      <div class="Sidebar-heading">
+        Repository
+        <button class="clear-btn" id="clear-repo" onclick="clearFilter('repo')">Clear</button>
+      </div>
+      <div class="Sidebar-search">
+        <span class="icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215zM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7z"/></svg></span>
+        <input type="text" id="repo-search" placeholder="Filter repositories..." oninput="filterRepoList()">
+      </div>
+      <ul class="FilterList" id="repo-filter-list"></ul>
+    </div>
+
+    <!-- Workflow Filter (multi-select) -->
+    <div class="Sidebar-section">
+      <div class="Sidebar-heading">
+        Workflow
+        <button class="clear-btn" id="clear-workflow" onclick="clearFilter('workflow')">Clear</button>
+      </div>
+      <div class="Sidebar-search">
+        <span class="icon"><svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215zM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7z"/></svg></span>
+        <input type="text" id="workflow-search" placeholder="Filter workflows..." oninput="filterWorkflowList()">
+      </div>
+      <ul class="FilterList" id="workflow-filter-list"></ul>
+    </div>
+
+  </aside>
+
+  <!-- Main Content -->
+  <main class="Main">
+
+    <div class="page-heading">
+      <h2>Actions &middot; <span class="active-org-name" id="active-org-label">--</span></h2>
+    </div>
+
+    <!-- Status tabs -->
+    <nav class="UnderlineNav" id="status-tabs">
+      <a class="UnderlineNav-item selected" data-status="">
+        All <span class="Counter" id="tab-total">0</span>
+      </a>
+      <a class="UnderlineNav-item" data-status="success" style="color:var(--color-success-fg)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--color-success-fg)"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zm3.78-9.72a.751.751 0 0 0-1.08-.022L7.477 9.417 5.384 7.323a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2.5 2.5a.75.75 0 0 0 1.06 0l3.875-3.575a.751.751 0 0 0 .021-1.028z"/></svg>
+        Success <span class="Counter" id="tab-success">0</span>
+      </a>
+      <a class="UnderlineNav-item" data-status="failure" style="color:var(--color-danger-fg)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--color-danger-fg)"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657zM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.751.751 0 0 0 .018 1.042.751.751 0 0 0 1.042.018L8 9.06l1.97 1.97a.751.751 0 0 0 1.042-.018.751.751 0 0 0 .018-1.042L9.06 8l1.97-1.97a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L8 6.94z"/></svg>
+        Failure <span class="Counter" id="tab-failure">0</span>
+      </a>
+      <a class="UnderlineNav-item" data-status="in_progress" style="color:var(--color-attention-fg)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--color-attention-fg)"><path d="M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>
+        In progress <span class="Counter" id="tab-running">0</span>
+      </a>
+    </nav>
+
+    <!-- Search -->
+    <div class="main-search">
+      <span class="icon"><svg width="16" height="16" viewBox="0 0 16 16" fill="var(--color-fg-muted)"><path d="M10.68 11.74a6 6 0 0 1-7.922-8.982 6 6 0 0 1 8.982 7.922l3.04 3.04a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215zM11.5 7a4.499 4.499 0 1 0-8.997 0A4.499 4.499 0 0 0 11.5 7z"/></svg></span>
+      <input type="text" id="search-input" placeholder="Search workflow runs...">
+    </div>
+
+    <!-- Active filter tags -->
+    <div class="active-filters" id="active-filters"></div>
+
+    <!-- Run list -->
+    <div class="Box">
+      <div class="Box-header">
+        <span><span id="showing-count">0</span> workflow runs</span>
+      </div>
+      <div id="runs-list"></div>
+      <div class="blankslate" id="empty-state" style="display:none;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <h3>No workflow runs found</h3>
+        <p>Try adjusting your filters or wait for new runs</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const svgIcons = {
+  success: '<svg width="20" height="20" viewBox="0 0 16 16" fill="var(--color-success-fg)"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zm3.78-9.72a.751.751 0 0 0-1.08-.022L7.477 9.417 5.384 7.323a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2.5 2.5a.75.75 0 0 0 1.06 0l3.875-3.575a.751.751 0 0 0 .021-1.028z"/></svg>',
+  failure: '<svg width="20" height="20" viewBox="0 0 16 16" fill="var(--color-danger-fg)"><path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657zM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.751.751 0 0 0 .018 1.042.751.751 0 0 0 1.042.018L8 9.06l1.97 1.97a.751.751 0 0 0 1.042-.018.751.751 0 0 0 .018-1.042L9.06 8l1.97-1.97a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L8 6.94z"/></svg>',
+  in_progress: '<svg width="20" height="20" viewBox="0 0 16 16" fill="var(--color-attention-fg)" style="animation:spin 1s linear infinite"><path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16zm0-1.5A6.5 6.5 0 1 0 8 1.5a6.5 6.5 0 0 0 0 13zM8 5a.75.75 0 0 1 .75.75v2.5h2.5a.75.75 0 0 1 0 1.5h-3.25A.75.75 0 0 1 7.25 9V5.75A.75.75 0 0 1 8 5z"/></svg>',
+  queued: '<svg width="20" height="20" viewBox="0 0 16 16" fill="var(--color-fg-muted)"><path d="M8 2a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm0 1.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9z"/></svg>',
+  cancelled: '<svg width="20" height="20" viewBox="0 0 16 16" fill="var(--color-fg-muted)"><path d="M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53z M5.31 1.5 1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5zM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>',
+  skipped: '<svg width="20" height="20" viewBox="0 0 16 16" fill="var(--color-fg-muted)"><path d="M1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0zM8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.28 5.78a.75.75 0 0 0-1.06-1.06l-5.5 5.5a.75.75 0 1 0 1.06 1.06z"/></svg>'
+};
+
+let selectedStatuses = new Set();
+let selectedRepos = new Set();
+let selectedWorkflows = new Set();
+let searchTerm = '';
+let allRepos = [];
+let allWorkflows = [];
+
+function getStatus(run) {
+  if (run.status === 'in_progress') return 'in_progress';
+  if (run.status === 'queued') return 'queued';
+  return run.conclusion || 'queued';
+}
+
+function timeAgo(dateStr) {
+  const s = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (s < 5) return 'now';
+  if (s < 60) return s + 's ago';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ago';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ago';
+  return Math.floor(h / 24) + 'd ago';
+}
+
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function encURI(s) { return s ? encodeURIComponent(s) : ''; }
+
+/* --- Org switching (dropdown) --- */
+async function fetchOrgs() {
+  try {
+    const resp = await fetch('/api/orgs');
+    const orgs = await resp.json();
+    renderOrgs(orgs || []);
+  } catch(e) {}
+}
+
+function renderOrgs(orgs) {
+  const sel = document.getElementById('org-select');
+  if (!orgs.length) { sel.innerHTML = '<option>No orgs configured</option>'; return; }
+  const activeOrg = orgs.find(o => o.active);
+  sel.innerHTML = orgs.map(o =>
+    '<option value="' + esc(o.name) + '"' + (o.active ? ' selected' : '') + '>' +
+    esc(o.organization) + ' (' + o.run_count + ' runs)</option>'
+  ).join('');
+  if (activeOrg) document.getElementById('active-org-label').textContent = activeOrg.organization;
+}
+
+async function switchOrg(name) {
+  try {
+    await fetch('/api/orgs/active', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name})
+    });
+    clearAllFilters();
+    refreshAll();
+  } catch(e) { console.error('switch org failed', e); }
+}
+
+/* --- Multi-select filters --- */
+function toggleStatus(status) {
+  if (selectedStatuses.has(status)) selectedStatuses.delete(status);
+  else selectedStatuses.add(status);
+  syncStatusUI();
+  updateFilterTags();
+  fetchRuns();
+}
+
+function toggleRepo(repo) {
+  if (selectedRepos.has(repo)) selectedRepos.delete(repo);
+  else selectedRepos.add(repo);
+  syncRepoUI();
+  updateFilterTags();
+  fetchRuns();
+}
+
+function toggleWorkflow(wf) {
+  if (selectedWorkflows.has(wf)) selectedWorkflows.delete(wf);
+  else selectedWorkflows.add(wf);
+  syncWorkflowUI();
+  updateFilterTags();
+  fetchRuns();
+}
+
+function syncStatusUI() {
+  document.querySelectorAll('#status-filter-list .FilterList-item').forEach(el => {
+    el.classList.toggle('selected', selectedStatuses.has(el.dataset.status));
+  });
+  document.getElementById('clear-status').classList.toggle('visible', selectedStatuses.size > 0);
+  // Sync tabs
+  document.querySelectorAll('#status-tabs .UnderlineNav-item').forEach(el => {
+    const s = el.dataset.status;
+    if (s === '') el.classList.toggle('selected', selectedStatuses.size === 0);
+    else el.classList.toggle('selected', selectedStatuses.size === 1 && selectedStatuses.has(s));
+  });
+}
+
+function syncRepoUI() {
+  document.querySelectorAll('#repo-filter-list .FilterList-item').forEach(el => {
+    el.classList.toggle('selected', selectedRepos.has(el.dataset.repo));
+  });
+  document.getElementById('clear-repo').classList.toggle('visible', selectedRepos.size > 0);
+}
+
+function syncWorkflowUI() {
+  document.querySelectorAll('#workflow-filter-list .FilterList-item').forEach(el => {
+    el.classList.toggle('selected', selectedWorkflows.has(el.dataset.workflow));
+  });
+  document.getElementById('clear-workflow').classList.toggle('visible', selectedWorkflows.size > 0);
+}
+
+function clearFilter(type) {
+  if (type === 'status') { selectedStatuses.clear(); syncStatusUI(); }
+  else if (type === 'repo') { selectedRepos.clear(); syncRepoUI(); }
+  else if (type === 'workflow') { selectedWorkflows.clear(); syncWorkflowUI(); }
+  updateFilterTags();
+  fetchRuns();
+}
+
+function clearAllFilters() {
+  selectedStatuses.clear();
+  selectedRepos.clear();
+  selectedWorkflows.clear();
+  searchTerm = '';
+  document.getElementById('search-input').value = '';
+  syncStatusUI();
+  syncRepoUI();
+  syncWorkflowUI();
+  updateFilterTags();
+}
+
+function updateFilterTags() {
+  const el = document.getElementById('active-filters');
+  let html = '';
+  selectedRepos.forEach(r => {
+    html += '<span class="filter-tag">repo: ' + esc(r) + ' <span class="remove" onclick="removeTag(\'repo\',\'' + esc(r) + '\')">&times;</span></span>';
+  });
+  selectedStatuses.forEach(s => {
+    html += '<span class="filter-tag">status: ' + esc(s) + ' <span class="remove" onclick="removeTag(\'status\',\'' + esc(s) + '\')">&times;</span></span>';
+  });
+  selectedWorkflows.forEach(w => {
+    html += '<span class="filter-tag">workflow: ' + esc(w) + ' <span class="remove" onclick="removeTag(\'workflow\',\'' + esc(w) + '\')">&times;</span></span>';
+  });
+  el.innerHTML = html;
+}
+
+function removeTag(type, val) {
+  if (type === 'status') { selectedStatuses.delete(val); syncStatusUI(); }
+  else if (type === 'repo') { selectedRepos.delete(val); syncRepoUI(); }
+  else if (type === 'workflow') { selectedWorkflows.delete(val); syncWorkflowUI(); }
+  updateFilterTags();
+  fetchRuns();
+}
+
+/* --- Sidebar lists (multi-select with checkboxes) --- */
+function renderRepoList(repos) {
+  allRepos = repos;
+  filterRepoList();
+}
+
+function filterRepoList() {
+  const q = (document.getElementById('repo-search').value || '').toLowerCase();
+  const filtered = q ? allRepos.filter(r => r.toLowerCase().includes(q)) : allRepos;
+  const el = document.getElementById('repo-filter-list');
+  el.innerHTML = filtered.map(r =>
+    '<li class="FilterList-item' + (selectedRepos.has(r) ? ' selected' : '') + '" data-repo="' + esc(r) + '" onclick="toggleRepo(\'' + esc(r) + '\')">' +
+    '<span class="check">&#10003;</span>' +
+    '<span class="label-text">' + esc(r) + '</span></li>'
+  ).join('');
+}
+
+function renderWorkflowList(workflows) {
+  allWorkflows = workflows;
+  filterWorkflowList();
+}
+
+function filterWorkflowList() {
+  const q = (document.getElementById('workflow-search').value || '').toLowerCase();
+  const filtered = q ? allWorkflows.filter(w => w.toLowerCase().includes(q)) : allWorkflows;
+  const el = document.getElementById('workflow-filter-list');
+  el.innerHTML = filtered.map(w =>
+    '<li class="FilterList-item' + (selectedWorkflows.has(w) ? ' selected' : '') + '" data-workflow="' + esc(w) + '" onclick="toggleWorkflow(\'' + esc(w) + '\')">' +
+    '<span class="check">&#10003;</span>' +
+    '<span class="label-text">' + esc(w) + '</span></li>'
+  ).join('');
+}
+
+/* --- Data fetching --- */
+async function fetchRuns() {
+  const params = new URLSearchParams();
+  if (selectedRepos.size) params.set('repo', [...selectedRepos].join(','));
+  if (selectedStatuses.size) params.set('status', [...selectedStatuses].join(','));
+  if (selectedWorkflows.size) params.set('workflow', [...selectedWorkflows].join(','));
+
+  try {
+    const resp = await fetch('/api/runs?' + params);
+    const runs = await resp.json();
+    renderRuns(runs || []);
+  } catch(e) { console.error('fetch error', e); }
+}
+
+async function fetchStats() {
+  try {
+    const resp = await fetch('/api/stats');
+    const s = await resp.json();
+    // Tabs
+    document.getElementById('tab-total').textContent = s.total_runs;
+    document.getElementById('tab-success').textContent = s.success;
+    document.getElementById('tab-failure').textContent = s.failure;
+    document.getElementById('tab-running').textContent = (s.in_progress || 0) + (s.queued || 0);
+    // Sidebar
+    document.getElementById('sidebar-total').textContent = s.total_runs;
+    document.getElementById('sidebar-success').textContent = s.success;
+    document.getElementById('sidebar-failure').textContent = s.failure;
+    document.getElementById('sidebar-running').textContent = s.in_progress || 0;
+    document.getElementById('sidebar-queued').textContent = s.queued || 0;
+    document.getElementById('sidebar-cancelled').textContent = s.cancelled || 0;
+  } catch(e) {}
+}
+
+async function fetchFilters() {
+  try {
+    const resp = await fetch('/api/filters');
+    const f = await resp.json();
+    renderRepoList(f.repos || []);
+    renderWorkflowList(f.workflows || []);
+  } catch(e) {}
+}
+
+function renderRuns(runs) {
+  let filtered = runs;
+  if (searchTerm) {
+    const q = searchTerm.toLowerCase();
+    filtered = runs.filter(r =>
+      (r.workflow_name || '').toLowerCase().includes(q) ||
+      (r.repo_name || '').toLowerCase().includes(q) ||
+      (r.head_branch || '').toLowerCase().includes(q) ||
+      (r.actor || '').toLowerCase().includes(q)
+    );
+  }
+
+  const list = document.getElementById('runs-list');
+  const empty = document.getElementById('empty-state');
+  document.getElementById('showing-count').textContent = filtered.length;
+
+  if (!filtered.length) { list.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  list.innerHTML = filtered.map(r => {
+    const st = getStatus(r);
+    const icon = svgIcons[st] || svgIcons.queued;
+    const repoUrl = 'https://github.com/' + encURI(r.repo_owner) + '/' + encURI(r.repo_name);
+    const branchUrl = repoUrl + '/tree/' + encURI(r.head_branch);
+    const actorUrl = 'https://github.com/' + encURI(r.actor);
+    const initials = (r.actor || '?')[0].toUpperCase();
+
+    return '<div class="Box-row">' +
+      '<div class="status-icon"><a href="' + esc(r.html_url) + '" target="_blank" title="' + st + '">' + icon + '</a></div>' +
+      '<div class="run-info">' +
+        '<a class="run-title" href="' + esc(r.html_url) + '" target="_blank">' + esc(r.workflow_name) + '</a>' +
+        '<div class="run-meta">' +
+          '<a href="' + esc(repoUrl) + '" target="_blank">' + esc(r.repo_name) + '</a>' +
+          ' <span>#' + r.run_number + '</span>' +
+          ' &middot; ' + esc(r.event) +
+          ' &middot; ' +
+          '<a href="' + esc(actorUrl) + '" target="_blank" class="avatar" title="' + esc(r.actor) + '">' + initials + '</a> ' +
+          '<a href="' + esc(actorUrl) + '" target="_blank">' + esc(r.actor) + '</a>' +
+        '</div>' +
+      '</div>' +
+      '<div class="run-details">' +
+        '<a href="' + esc(branchUrl) + '" target="_blank" class="branch-name" title="' + esc(r.head_branch) + '">' + esc(r.head_branch) + '</a>' +
+        '<span>' + timeAgo(r.updated_at) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+}
+
+// Tab click handlers (single-click sets exclusive, click "All" clears)
+document.querySelectorAll('#status-tabs .UnderlineNav-item').forEach(tab => {
+  tab.addEventListener('click', function() {
+    const s = this.dataset.status;
+    if (s === '') {
+      selectedStatuses.clear();
+    } else {
+      selectedStatuses.clear();
+      selectedStatuses.add(s);
+    }
+    syncStatusUI();
+    updateFilterTags();
+    fetchRuns();
+  });
+});
+
+// Search
+let searchTimeout;
+document.getElementById('search-input').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => { searchTerm = this.value; fetchRuns(); }, 200);
+});
+
+function refreshAll() {
+  fetchOrgs();
+  fetchRuns();
+  fetchStats();
+  fetchFilters();
+}
+
+// Init
+refreshAll();
+setInterval(refreshAll, 5000);
+</script>
+</body>
+</html>
