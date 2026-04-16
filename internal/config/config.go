@@ -10,9 +10,24 @@ import (
 )
 
 type OrgConfig struct {
-	Name        string `yaml:"name" json:"name"`
-	GitHubToken string `yaml:"github_token" json:"-"`
+	Name         string `yaml:"name" json:"name"`
+	GitHubToken  string `yaml:"github_token" json:"-"`
 	Organization string `yaml:"organization" json:"organization"`
+	BaseURL      string `yaml:"base_url,omitempty" json:"base_url,omitempty"`
+}
+
+func (o *OrgConfig) GitHubBaseURL() string {
+	if o.BaseURL != "" {
+		return o.BaseURL
+	}
+	return "https://github.com"
+}
+
+func (o *OrgConfig) GitHubAPIURL() string {
+	if o.BaseURL != "" {
+		return o.BaseURL + "/api/v3"
+	}
+	return ""
 }
 
 type Config struct {

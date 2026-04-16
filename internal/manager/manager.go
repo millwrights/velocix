@@ -46,7 +46,7 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) *Manager 
 
 func (m *Manager) startOrg(orgCfg config.OrgConfig) {
 	ctx, cancel := context.WithCancel(m.parentCtx)
-	client := gh.NewClient(orgCfg.GitHubToken, m.logger)
+	client := gh.NewClient(orgCfg.GitHubToken, orgCfg.BaseURL, m.logger)
 	st := store.NewStore(m.cfg.DataDir, orgCfg.Organization, m.logger)
 	p := poller.New(client, st, orgCfg.Organization, m.cfg.PollInterval, m.logger)
 	p.Start(ctx)
@@ -109,6 +109,7 @@ func (m *Manager) ListOrgs() []OrgInfo {
 			Organization: inst.Config.Organization,
 			Active:       inst.Config.Name == m.activeOrg,
 			RunCount:     len(inst.Store.GetAll()),
+			BaseURL:      inst.Config.GitHubBaseURL(),
 		})
 	}
 	return orgs
@@ -119,6 +120,7 @@ type OrgInfo struct {
 	Organization string `json:"organization"`
 	Active       bool   `json:"active"`
 	RunCount     int    `json:"run_count"`
+	BaseURL      string `json:"base_url"`
 }
 
 func (m *Manager) Stop() {

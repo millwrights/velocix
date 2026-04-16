@@ -23,11 +23,23 @@ type Client struct {
 	logger *slog.Logger
 }
 
-func NewClient(token string, logger *slog.Logger) *Client {
+func NewClient(token string, baseURL string, logger *slog.Logger) *Client {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(context.Background(), ts)
+	gh := github.NewClient(tc)
+
+	if baseURL != "" {
+		apiURL := baseURL + "/api/v3/"
+		uploadURL := baseURL + "/api/uploads/"
+		var err error
+		gh, err = gh.WithEnterpriseURLs(apiURL, uploadURL)
+		if err != nil {
+			logger.Warn("failed to configure enterprise URLs, using default", "error", err)
+		}
+	}
+
 	return &Client{
-		gh:     github.NewClient(tc),
+		gh:     gh,
 		logger: logger,
 	}
 }

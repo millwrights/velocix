@@ -90,7 +90,11 @@ func runConfigShow(cmd *cobra.Command, args []string) error {
 			if o.GitHubToken != "" {
 				tokenDisplay = o.GitHubToken[:4] + "..." + o.GitHubToken[len(o.GitHubToken)-4:]
 			}
-			fmt.Printf("  %s%-20s  org: %-24s  token: %s\n", marker, o.Name, o.Organization, tokenDisplay)
+			urlDisplay := "github.com"
+			if o.BaseURL != "" {
+				urlDisplay = o.BaseURL
+			}
+			fmt.Printf("  %s%-20s  org: %-24s  url: %-30s  token: %s\n", marker, o.Name, o.Organization, urlDisplay, tokenDisplay)
 		}
 	}
 	return nil
@@ -157,10 +161,19 @@ func runConfigAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	fmt.Println()
+	fmt.Println("  For GitHub Enterprise, enter your server URL (e.g. https://github.example.com)")
+	fmt.Print("  GitHub URL [https://github.com]: ")
+	baseURL := readLine()
+	if baseURL == "https://github.com" {
+		baseURL = ""
+	}
+
 	orgCfg := config.OrgConfig{
 		Name:         name,
 		GitHubToken:  token,
 		Organization: org,
+		BaseURL:      baseURL,
 	}
 
 	if err := cfg.AddOrg(orgCfg); err != nil {
@@ -271,7 +284,17 @@ func runConfigInit(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	fmt.Println("  Step 3: Optional Settings (press Enter for defaults)")
+	fmt.Println("  Step 3: GitHub URL")
+	fmt.Println()
+	fmt.Println("  For GitHub Enterprise, enter your server URL (e.g. https://github.example.com)")
+	fmt.Print("  GitHub URL [https://github.com]: ")
+	baseURL := readLine()
+	if baseURL == "https://github.com" {
+		baseURL = ""
+	}
+
+	fmt.Println()
+	fmt.Println("  Step 4: Optional Settings (press Enter for defaults)")
 	fmt.Println()
 	fmt.Print("  Web port [8080]: ")
 	portStr := readLine()
@@ -295,6 +318,7 @@ func runConfigInit(cmd *cobra.Command, args []string) error {
 			Name:         org,
 			GitHubToken:  token,
 			Organization: org,
+			BaseURL:      baseURL,
 		},
 	}
 	cfg.ActiveOrg = org

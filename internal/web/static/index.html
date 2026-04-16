@@ -603,6 +603,7 @@ let selectedWorkflows = new Set();
 let searchTerm = '';
 let allRepos = [];
 let allWorkflows = [];
+let activeOrgBaseURL = 'https://github.com';
 
 function getStatus(run) {
   if (run.status === 'in_progress') return 'in_progress';
@@ -641,7 +642,10 @@ function renderOrgs(orgs) {
     '<option value="' + esc(o.name) + '"' + (o.active ? ' selected' : '') + '>' +
     esc(o.organization) + ' (' + o.run_count + ' runs)</option>'
   ).join('');
-  if (activeOrg) document.getElementById('active-org-label').textContent = activeOrg.organization;
+  if (activeOrg) {
+    document.getElementById('active-org-label').textContent = activeOrg.organization;
+    activeOrgBaseURL = (activeOrg.base_url || 'https://github.com').replace(/\/$/, '');
+  }
 }
 
 async function switchOrg(name) {
@@ -848,9 +852,9 @@ function renderRuns(runs) {
   list.innerHTML = filtered.map(r => {
     const st = getStatus(r);
     const icon = svgIcons[st] || svgIcons.queued;
-    const repoUrl = 'https://github.com/' + encURI(r.repo_owner) + '/' + encURI(r.repo_name);
+    const repoUrl = activeOrgBaseURL + '/' + encURI(r.repo_owner) + '/' + encURI(r.repo_name);
     const branchUrl = repoUrl + '/tree/' + encURI(r.head_branch);
-    const actorUrl = 'https://github.com/' + encURI(r.actor);
+    const actorUrl = activeOrgBaseURL + '/' + encURI(r.actor);
     const initials = (r.actor || '?')[0].toUpperCase();
 
     return '<div class="Box-row">' +

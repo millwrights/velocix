@@ -17,8 +17,16 @@ build-amd64:
 build-arm64:
 	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-darwin-arm64 ./cmd/velocix
 
-## Build for all macOS targets
-build-all: build-amd64 build-arm64
+## Build for Linux AMD64
+build-linux-amd64:
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-amd64 ./cmd/velocix
+
+## Build for Linux ARM64
+build-linux-arm64:
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(APP_NAME)-linux-arm64 ./cmd/velocix
+
+## Build for all targets
+build-all: build-amd64 build-arm64 build-linux-amd64 build-linux-arm64
 
 ## Run web server
 run-serve:
