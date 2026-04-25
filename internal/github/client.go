@@ -129,12 +129,10 @@ type graphqlResponse struct {
 	} `json:"errors"`
 }
 
-// listActiveRepos uses a single GraphQL call to get all repos sorted by
-// push date, then returns only repos pushed within the last 24 hours.
-// This replaces the paginated REST approach and skips dormant repos entirely.
+// listActiveRepos uses GraphQL to list all org repos in a single call
+// (vs paginated REST). Workflow run time filtering happens in fetchRepoRuns.
 func (c *Client) listActiveRepos(ctx context.Context, org string) ([]string, error) {
-	since := time.Now().Add(-24 * time.Hour)
-	var activeRepos []string
+	var allRepos []string
 	var cursor *string
 
 	for {
@@ -180,12 +178,7 @@ func (c *Client) listActiveRepos(ctx context.Context, org string) ([]string, err
 
 		repos := result.Data.Organization.Repositories
 		for _, r := range repos.Nodes {
-			if r.PushedAt.Before(since) {
-				// Sorted by pushedAt DESC — all remaining repos are older, stop early
-				c.logger.Info("skipping dormant repos", "org", org, "active", len(activeRepos))
-				return activeRepos, nil
-			}
-			activeRepos = append(activeRepos, r.Name)
+			allRepos = append(allRepos, r.Name)
 		}
 
 		if !repos.PageInfo.HasNextPage {
@@ -195,7 +188,8 @@ func (c *Client) listActiveRepos(ctx context.Context, org string) ([]string, err
 		cursor = &endCursor
 	}
 
-	return activeRepos, nil
+	c.logger.Info("listed repos via graphql", "org", org, "count", len(allRepos))
+	return allRepos, nil
 }
 
 func (c *Client) fetchRepoRuns(ctx context.Context, owner, repo string) ([]model.WorkflowRun, error) {
