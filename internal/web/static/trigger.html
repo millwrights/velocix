@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" data-color-mode="dark" data-dark-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Velocix - Trigger Pipeline</title>
+<style>
+  :root {
+    --color-canvas-default: #0d1117;
+    --color-canvas-subtle: #161b22;
+    --color-canvas-inset: #010409;
+    --color-border-default: #30363d;
+    --color-border-muted: #21262d;
+    --color-fg-default: #e6edf3;
+    --color-fg-muted: #8b949e;
+    --color-fg-subtle: #6e7681;
+    --color-accent-fg: #58a6ff;
+    --color-accent-emphasis: #1f6feb;
+    --color-success-fg: #3fb950;
+    --color-success-emphasis: #238636;
+    --color-danger-fg: #f85149;
+    --color-attention-fg: #d29922;
+    --color-done-fg: #a371f7;
+    --color-btn-bg: #21262d;
+    --color-btn-border: rgba(240,246,252,0.1);
+    --color-btn-hover-bg: #30363d;
+    --color-header-bg: #161b22;
+    --color-counter-bg: rgba(110,118,129,0.4);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    font-size: 14px; line-height: 1.5;
+    color: var(--color-fg-default);
+    background: var(--color-canvas-default);
+  }
+  .AppHeader {
+    background: var(--color-header-bg);
+    border-bottom: 1px solid var(--color-border-default);
+    padding: 0 16px; height: 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  }
+  .AppHeader-logo {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--color-fg-default); font-weight: 600; font-size: 16px; text-decoration: none;
+  }
+  .AppHeader-nav { display: flex; gap: 16px; }
+  .AppHeader-nav a {
+    color: var(--color-fg-muted); text-decoration: none; font-size: 14px;
+    padding: 12px 0; border-bottom: 2px solid transparent;
+  }
+  .AppHeader-nav a:hover { color: var(--color-fg-default); }
+  .AppHeader-nav a.active { color: var(--color-fg-default); border-bottom-color: #f78166; }
+
+  .container { max-width: 960px; margin: 72px auto 40px; padding: 0 24px; }
+
+  h1 { font-size: 24px; font-weight: 400; margin-bottom: 24px; }
+  h1 span { color: var(--color-accent-fg); }
+
+  /* Pipeline selector */
+  .selector-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .selector-row select, .selector-row .btn {
+    padding: 8px 12px; font-size: 14px; font-family: inherit;
+    color: var(--color-fg-default); background: var(--color-btn-bg);
+    border: 1px solid var(--color-border-default); border-radius: 6px;
+    cursor: pointer;
+  }
+  .selector-row select { min-width: 220px; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8.825c-.2 0-.4-.1-.5-.2l-3.3-3.3c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0L6 6.925l2.7-2.7c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1l-3.3 3.3c-.1.1-.3.2-.5.2z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+  }
+  .selector-row select:hover { border-color: var(--color-accent-fg); }
+
+  /* Pipeline info card */
+  .pipeline-info {
+    background: var(--color-canvas-subtle); border: 1px solid var(--color-border-default);
+    border-radius: 6px; padding: 16px; margin-bottom: 24px; display: none;
+  }
+  .pipeline-info.visible { display: block; }
+  .pipeline-info h3 { font-size: 16px; margin-bottom: 4px; }
+  .pipeline-info p { color: var(--color-fg-muted); font-size: 13px; }
+  .pipeline-info .meta { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: var(--color-fg-subtle); }
+
+  /* Input form */
+  .input-form { display: none; }
+  .input-form.visible { display: block; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px;
+  }
+  .form-group .desc { font-size: 12px; color: var(--color-fg-muted); margin-bottom: 6px; }
+  .form-group input[type="text"],
+  .form-group input[type="number"],
+  .form-group select,
+  .form-group textarea {
+    width: 100%; max-width: 480px; padding: 8px 12px; font-size: 14px; font-family: inherit;
+    color: var(--color-fg-default); background: var(--color-canvas-default);
+    border: 1px solid var(--color-border-default); border-radius: 6px; outline: none;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--color-accent-fg); box-shadow: 0 0 0 3px rgba(31,111,235,0.3);
+  }
+  .form-group textarea { min-height: 80px; resize: vertical; }
+  .form-group .toggle {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+  }
+  .form-group .toggle input[type="checkbox"] {
+    width: 40px; height: 22px; appearance: none; background: var(--color-btn-bg);
+    border: 1px solid var(--color-border-default); border-radius: 11px;
+    position: relative; cursor: pointer; transition: background 0.2s;
+  }
+  .form-group .toggle input[type="checkbox"]::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--color-fg-muted);
+    transition: transform 0.2s;
+  }
+  .form-group .toggle input[type="checkbox"]:checked {
+    background: var(--color-success-emphasis); border-color: var(--color-success-emphasis);
+  }
+  .form-group .toggle input[type="checkbox"]:checked::after {
+    transform: translateX(18px); background: #fff;
+  }
+  .form-group select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8.825c-.2 0-.4-.1-.5-.2l-3.3-3.3c-.3-.3-.3-.8 0-1.1.3-.3.8-.3 1.1 0L6 6.925l2.7-2.7c.3-.3.8-.3 1.1 0 .3.3.3.8 0 1.1l-3.3 3.3c-.1.1-.3.2-.5.2z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px;
+  }
+
+  /* Run button */
+  .btn-run {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 20px; font-size: 14px; font-weight: 500; font-family: inherit;
+    color: #fff; background: var(--color-success-emphasis);
+    border: 1px solid rgba(240,246,252,0.1); border-radius: 6px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .btn-run:hover { background: #2ea043; }
+  .btn-run:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-run svg { fill: currentColor; }
+
+  /* Run output */
+  .run-output { display: none; margin-top: 24px; }
+  .run-output.visible { display: block; }
+  .run-output h3 { font-size: 16px; margin-bottom: 12px; }
+
+  .stage-list { border: 1px solid var(--color-border-default); border-radius: 6px; overflow: hidden; }
+  .stage-item {
+    padding: 10px 16px; border-bottom: 1px solid var(--color-border-muted);
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+  }
+  .stage-item:last-child { border-bottom: none; }
+  .stage-item:hover { background: var(--color-canvas-subtle); }
+  .stage-item .dot {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+  }
+  .stage-item .dot.pending { background: var(--color-fg-subtle); }
+  .stage-item .dot.running { background: var(--color-attention-fg); animation: pulse 1s infinite; }
+  .stage-item .dot.success { background: var(--color-success-fg); }
+  .stage-item .dot.failure { background: var(--color-danger-fg); }
+  .stage-item .name { flex: 1; font-size: 14px; }
+  .stage-item .duration { font-size: 12px; color: var(--color-fg-muted); }
+
+  .stage-output {
+    background: var(--color-canvas-inset); padding: 12px 16px;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.6; white-space: pre-wrap; color: var(--color-fg-muted);
+    border-bottom: 1px solid var(--color-border-muted); display: none;
+    max-height: 300px; overflow-y: auto;
+  }
+  .stage-output.visible { display: block; }
+
+  .run-status {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px;
+    border-radius: 2em; font-size: 12px; font-weight: 500; margin-bottom: 12px;
+  }
+  .run-status.running { background: rgba(210,153,34,0.15); color: var(--color-attention-fg); }
+  .run-status.success { background: rgba(63,185,80,0.15); color: var(--color-success-fg); }
+  .run-status.failure { background: rgba(248,81,73,0.15); color: var(--color-danger-fg); }
+
+  /* Runs history */
+  .runs-history { margin-top: 32px; }
+  .runs-history h3 { font-size: 16px; margin-bottom: 12px; }
+  .history-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border: 1px solid var(--color-border-default); border-radius: 6px; margin-bottom: 8px;
+    cursor: pointer; transition: background 0.1s;
+  }
+  .history-item:hover { background: var(--color-canvas-subtle); }
+  .history-item .hist-name { flex: 1; font-weight: 500; }
+  .history-item .hist-repo { color: var(--color-fg-muted); font-size: 13px; }
+  .history-item .hist-time { color: var(--color-fg-subtle); font-size: 12px; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .empty-state {
+    text-align: center; padding: 48px 24px; color: var(--color-fg-muted);
+  }
+  .empty-state h3 { color: var(--color-fg-default); margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<header class="AppHeader">
+  <a class="AppHeader-logo" href="/">
+    <svg width="28" height="28" viewBox="0 0 100 100" fill="none"><defs><linearGradient id="vlogo" x1="0" y1="0" x2="100" y2="100"><stop offset="0%" stop-color="#58a6ff"/><stop offset="100%" stop-color="#3fb950"/></linearGradient></defs><circle cx="50" cy="50" r="46" stroke="url(#vlogo)" stroke-width="5" fill="none"/><path d="M28 30 L50 72 L72 30" stroke="url(#vlogo)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/><line x1="18" y1="50" x2="34" y2="50" stroke="#58a6ff" stroke-width="4" stroke-linecap="round" opacity="0.6"/><line x1="15" y1="38" x2="28" y2="38" stroke="#58a6ff" stroke-width="3" stroke-linecap="round" opacity="0.4"/><line x1="15" y1="62" x2="28" y2="62" stroke="#58a6ff" stroke-width="3" stroke-linecap="round" opacity="0.4"/></svg>
+    Velocix
+  </a>
+  <nav class="AppHeader-nav">
+    <a href="/">Dashboard</a>
+    <a href="/trigger" class="active">Trigger</a>
+  </nav>
+</header>
+
+<div class="container">
+  <h1>Trigger <span>Pipeline</span></h1>
+
+  <div class="selector-row">
+    <select id="repo-select" onchange="onRepoChange()">
+      <option value="">Select repository...</option>
+    </select>
+    <select id="pipeline-select" onchange="onPipelineChange()" disabled>
+      <option value="">Select pipeline...</option>
+    </select>
+  </div>
+
+  <div class="pipeline-info" id="pipeline-info">
+    <h3 id="pi-name"></h3>
+    <p id="pi-desc"></p>
+    <div class="meta">
+      <span id="pi-inputs">0 inputs</span>
+      <span id="pi-stages">0 stages</span>
+    </div>
+  </div>
+
+  <div class="input-form" id="input-form">
+    <h3 style="font-size:16px;margin-bottom:16px;">Inputs</h3>
+    <div id="inputs-container"></div>
+    <button class="btn-run" id="run-btn" onclick="triggerRun()" disabled>
+      <svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>
+      Run Pipeline
+    </button>
+  </div>
+
+  <div class="run-output" id="run-output">
+    <h3>Pipeline Execution</h3>
+    <div class="run-status" id="run-status"></div>
+    <div class="stage-list" id="stage-list"></div>
+  </div>
+
+  <div class="runs-history" id="runs-history">
+    <h3>Recent Runs</h3>
+    <div id="history-list"></div>
+  </div>
+</div>
+
+<script>
+let allPipelines = [];
+let currentPipeline = null;
+let currentRunId = null;
+let pollTimer = null;
+
+function esc(s) { if (!s) return ''; const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+async function init() {
+  try {
+    const resp = await fetch('/api/pipelines');
+    allPipelines = await resp.json();
+    if (!allPipelines) allPipelines = [];
+  } catch(e) { allPipelines = []; }
+
+  const repos = [...new Set(allPipelines.map(p => p.repo))].sort();
+  const sel = document.getElementById('repo-select');
+  sel.innerHTML = '<option value="">Select repository...</option>' +
+    repos.map(r => '<option value="'+esc(r)+'">'+esc(r)+'</option>').join('');
+
+  loadHistory();
+}
+
+function onRepoChange() {
+  const repo = document.getElementById('repo-select').value;
+  const psel = document.getElementById('pipeline-select');
+  if (!repo) {
+    psel.innerHTML = '<option value="">Select pipeline...</option>';
+    psel.disabled = true;
+    hidePipeline();
+    return;
+  }
+  const pipes = allPipelines.filter(p => p.repo === repo);
+  psel.innerHTML = '<option value="">Select pipeline...</option>' +
+    pipes.map(p => '<option value="'+esc(p.path)+'">'+esc(p.name)+' ('+esc(p.path)+')</option>').join('');
+  psel.disabled = false;
+  hidePipeline();
+}
+
+function hidePipeline() {
+  document.getElementById('pipeline-info').classList.remove('visible');
+  document.getElementById('input-form').classList.remove('visible');
+  document.getElementById('run-output').classList.remove('visible');
+  currentPipeline = null;
+}
+
+async function onPipelineChange() {
+  const repo = document.getElementById('repo-select').value;
+  const path = document.getElementById('pipeline-select').value;
+  if (!repo || !path) { hidePipeline(); return; }
+
+  try {
+    const resp = await fetch('/api/pipelines/detail?repo='+encodeURIComponent(repo)+'&path='+encodeURIComponent(path));
+    currentPipeline = await resp.json();
+    currentPipeline._repo = repo;
+    currentPipeline._path = path;
+  } catch(e) { hidePipeline(); return; }
+
+  const info = document.getElementById('pipeline-info');
+  document.getElementById('pi-name').textContent = currentPipeline.name;
+  document.getElementById('pi-desc').textContent = currentPipeline.description || 'No description';
+  document.getElementById('pi-inputs').textContent = Object.keys(currentPipeline.inputs || {}).length + ' inputs';
+  document.getElementById('pi-stages').textContent = (currentPipeline.stages || []).length + ' stages';
+  info.classList.add('visible');
+
+  renderInputs(currentPipeline.inputs || {});
+  document.getElementById('input-form').classList.add('visible');
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('run-output').classList.remove('visible');
+}
+
+function renderInputs(inputs) {
+  const container = document.getElementById('inputs-container');
+  const entries = Object.entries(inputs);
+  if (!entries.length) {
+    container.innerHTML = '<p style="color:var(--color-fg-muted);margin-bottom:16px;">This pipeline has no inputs.</p>';
+    return;
+  }
+  container.innerHTML = entries.map(([name, inp]) => {
+    const defVal = inp.default != null ? String(inp.default) : '';
+    let field = '';
+    switch(inp.type) {
+      case 'choice':
+        field = '<select id="input-'+esc(name)+'" name="'+esc(name)+'">' +
+          (inp.options||[]).map(o => '<option value="'+esc(o)+'"'+(o===defVal?' selected':'')+'>'+esc(o)+'</option>').join('') +
+          '</select>';
+        break;
+      case 'boolean':
+        field = '<label class="toggle"><input type="checkbox" id="input-'+esc(name)+'" name="'+esc(name)+'"'+(defVal==='true'?' checked':'')+'><span>'+esc(name)+'</span></label>';
+        break;
+      case 'number':
+        field = '<input type="number" id="input-'+esc(name)+'" name="'+esc(name)+'" value="'+esc(defVal)+'">';
+        break;
+      case 'text':
+        field = '<textarea id="input-'+esc(name)+'" name="'+esc(name)+'">'+esc(defVal)+'</textarea>';
+        break;
+      default:
+        field = '<input type="text" id="input-'+esc(name)+'" name="'+esc(name)+'" value="'+esc(defVal)+'">';
+    }
+    return '<div class="form-group">' +
+      '<label>'+esc(name)+'</label>' +
+      (inp.description ? '<div class="desc">'+esc(inp.description)+'</div>' : '') +
+      field +
+      '</div>';
+  }).join('');
+}
+
+function gatherInputs() {
+  if (!currentPipeline || !currentPipeline.inputs) return {};
+  const result = {};
+  for (const [name, inp] of Object.entries(currentPipeline.inputs)) {
+    const el = document.getElementById('input-'+name);
+    if (!el) continue;
+    if (inp.type === 'boolean') {
+      result[name] = el.checked ? 'true' : 'false';
+    } else {
+      result[name] = el.value;
+    }
+  }
+  return result;
+}
+
+async function triggerRun() {
+  if (!currentPipeline) return;
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting...';
+
+  const inputs = gatherInputs();
+  try {
+    const resp = await fetch('/api/pipelines/run', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        repo: currentPipeline._repo,
+        path: currentPipeline._path,
+        inputs: inputs
+      })
+    });
+    const data = await resp.json();
+    currentRunId = data.id;
+    document.getElementById('run-output').classList.add('visible');
+    pollRunStatus();
+  } catch(e) {
+    console.error('trigger failed', e);
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z" fill="currentColor"/></svg> Run Pipeline';
+}
+
+async function pollRunStatus() {
+  if (!currentRunId) return;
+  if (pollTimer) clearInterval(pollTimer);
+
+  const update = async () => {
+    try {
+      const resp = await fetch('/api/pipelines/runs/detail?id='+currentRunId);
+      const run = await resp.json();
+      renderRunOutput(run);
+      if (run.status === 'success' || run.status === 'failure') {
+        clearInterval(pollTimer);
+        loadHistory();
+      }
+    } catch(e) {}
+  };
+  update();
+  pollTimer = setInterval(update, 1000);
+}
+
+function renderRunOutput(run) {
+  const statusEl = document.getElementById('run-status');
+  statusEl.className = 'run-status ' + run.status;
+  statusEl.textContent = run.status.charAt(0).toUpperCase() + run.status.slice(1);
+
+  const list = document.getElementById('stage-list');
+  list.innerHTML = (run.stages || []).map((s, i) => {
+    return '<div class="stage-item" onclick="toggleStageOutput('+i+')">' +
+      '<div class="dot '+s.status+'"></div>' +
+      '<span class="name">'+esc(s.name)+'</span>' +
+      (s.duration ? '<span class="duration">'+esc(s.duration)+'</span>' : '') +
+      '</div>' +
+      '<div class="stage-output" id="stage-out-'+i+'">'+esc(s.output || '')+'</div>';
+  }).join('');
+}
+
+function toggleStageOutput(idx) {
+  const el = document.getElementById('stage-out-'+idx);
+  if (el) el.classList.toggle('visible');
+}
+
+async function loadHistory() {
+  try {
+    const resp = await fetch('/api/pipelines/runs');
+    let runs = await resp.json();
+    if (!runs || !runs.length) {
+      document.getElementById('history-list').innerHTML = '<div class="empty-state"><p>No pipeline runs yet</p></div>';
+      return;
+    }
+    runs.sort((a,b) => new Date(b.started_at) - new Date(a.started_at));
+    document.getElementById('history-list').innerHTML = runs.slice(0, 20).map(r => {
+      const t = new Date(r.started_at).toLocaleString();
+      return '<div class="history-item" onclick="viewRun(\''+r.id+'\')">' +
+        '<div class="dot '+r.status+'" style="width:10px;height:10px;border-radius:50%;"></div>' +
+        '<span class="hist-name">'+esc(r.pipeline)+'</span>' +
+        '<span class="hist-repo">'+esc(r.repo)+'</span>' +
+        '<span class="hist-time">'+esc(t)+'</span>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('history-list').innerHTML = '<div class="empty-state"><p>Failed to load runs</p></div>';
+  }
+}
+
+async function viewRun(id) {
+  currentRunId = id;
+  document.getElementById('run-output').classList.add('visible');
+  try {
+    const resp = await fetch('/api/pipelines/runs/detail?id='+id);
+    const run = await resp.json();
+    renderRunOutput(run);
+  } catch(e) {}
+}
+
+init();
+</script>
+</body>
+</html>

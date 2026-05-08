@@ -55,6 +55,9 @@ func NewClient(token string, baseURL string, logger *slog.Logger) *Client {
 	}
 }
 
+func (c *Client) HTTPClient() *http.Client { return c.httpClient }
+func (c *Client) GraphQLURL() string       { return c.graphqlURL }
+
 func (c *Client) FetchAllWorkflowRuns(ctx context.Context, org string) ([]model.WorkflowRun, error) {
 	repos, err := c.listActiveRepos(ctx, org)
 	if err != nil {

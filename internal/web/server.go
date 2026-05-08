@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -27,6 +28,14 @@ func NewServer(mgr *manager.Manager, port int, logger *slog.Logger) *http.Server
 	mux.HandleFunc("GET /api/orgs", handleListOrgs(mgr))
 	mux.HandleFunc("POST /api/orgs/active", handleSetActiveOrg(mgr))
 
+	// YACD pipeline endpoints
+	mux.HandleFunc("GET /api/pipelines", handleListPipelines(mgr, logger))
+	mux.HandleFunc("GET /api/pipelines/detail", handleGetPipeline(mgr, logger))
+	mux.HandleFunc("POST /api/pipelines/run", handleRunPipeline(mgr, logger))
+	mux.HandleFunc("GET /api/pipelines/runs", handleListPipelineRuns(mgr))
+	mux.HandleFunc("GET /api/pipelines/runs/detail", handleGetPipelineRun(mgr))
+	mux.HandleFunc("GET /trigger", handleTriggerPage())
+
 	return &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: logMiddleware(logger, mux),
@@ -42,6 +51,14 @@ func logMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
 
 func handleIndex() http.HandlerFunc {
 	data, _ := staticFiles.ReadFile("static/index.html")
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
+	}
+}
+
+func handleTriggerPage() http.HandlerFunc {
+	data, _ := staticFiles.ReadFile("static/trigger.html")
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(data)
@@ -109,6 +126,103 @@ func handleSetActiveOrg(mgr *manager.Manager) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, map[string]string{"active": mgr.GetActiveOrg()})
+	}
+}
+
+// --- YACD Pipeline handlers ---
+
+func handleListPipelines(mgr *manager.Manager, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		scanner := mgr.GetActiveScanner()
+		orgCfg := mgr.GetActiveOrgConfig()
+		if scanner == nil || orgCfg == nil {
+			writeJSON(w, []any{})
+			return
+		}
+		pipelines, err := scanner.ScanOrg(context.Background(), orgCfg.Organization)
+		if err != nil {
+			logger.Error("failed to scan pipelines", "error", err)
+			writeJSON(w, []any{})
+			return
+		}
+		writeJSON(w, pipelines)
+	}
+}
+
+func handleGetPipeline(mgr *manager.Manager, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		scanner := mgr.GetActiveScanner()
+		orgCfg := mgr.GetActiveOrgConfig()
+		if scanner == nil || orgCfg == nil {
+			http.Error(w, `{"error":"no active org"}`, http.StatusBadRequest)
+			return
+		}
+		repo := r.URL.Query().Get("repo")
+		path := r.URL.Query().Get("path")
+		if repo == "" || path == "" {
+			http.Error(w, `{"error":"repo and path required"}`, http.StatusBadRequest)
+			return
+		}
+		pipeline, err := scanner.FetchPipeline(context.Background(), orgCfg.Organization, repo, path)
+		if err != nil {
+			logger.Error("failed to fetch pipeline", "error", err)
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, pipeline)
+	}
+}
+
+func handleRunPipeline(mgr *manager.Manager, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		scanner := mgr.GetActiveScanner()
+		orgCfg := mgr.GetActiveOrgConfig()
+		if scanner == nil || orgCfg == nil {
+			http.Error(w, `{"error":"no active org"}`, http.StatusBadRequest)
+			return
+		}
+
+		var body struct {
+			Repo   string            `json:"repo"`
+			Path   string            `json:"path"`
+			Inputs map[string]string `json:"inputs"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, `{"error":"invalid body"}`, http.StatusBadRequest)
+			return
+		}
+
+		pipeline, err := scanner.FetchPipeline(context.Background(), orgCfg.Organization, body.Repo, body.Path)
+		if err != nil {
+			logger.Error("failed to fetch pipeline for run", "error", err)
+			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err), http.StatusInternalServerError)
+			return
+		}
+
+		id := mgr.Runner().Run(context.Background(), pipeline, orgCfg.Organization, body.Repo, body.Path, body.Inputs)
+		writeJSON(w, map[string]string{"id": id})
+	}
+}
+
+func handleListPipelineRuns(mgr *manager.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, mgr.Runner().ListRuns())
+	}
+}
+
+func handleGetPipelineRun(mgr *manager.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, `{"error":"id required"}`, http.StatusBadRequest)
+			return
+		}
+		run := mgr.Runner().GetRun(id)
+		if run == nil {
+			http.Error(w, `{"error":"run not found"}`, http.StatusNotFound)
+			return
+		}
+		writeJSON(w, run)
 	}
 }
 

@@ -9,13 +9,16 @@ import (
 	gh "github.com/skalluru/velocix/internal/github"
 	"github.com/skalluru/velocix/internal/poller"
 	"github.com/skalluru/velocix/internal/store"
+	"github.com/skalluru/velocix/internal/yacd"
 )
 
 type OrgInstance struct {
-	Config config.OrgConfig
-	Store  *store.Store
-	Poller *poller.Poller
-	Cancel context.CancelFunc
+	Config  config.OrgConfig
+	Client  *gh.Client
+	Store   *store.Store
+	Poller  *poller.Poller
+	Scanner *yacd.Scanner
+	Cancel  context.CancelFunc
 }
 
 type Manager struct {
@@ -25,6 +28,7 @@ type Manager struct {
 	activeOrg string
 	logger    *slog.Logger
 	parentCtx context.Context
+	runner    *yacd.Runner
 }
 
 func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) *Manager {
@@ -34,9 +38,9 @@ func New(ctx context.Context, cfg *config.Config, logger *slog.Logger) *Manager 
 		activeOrg: cfg.ActiveOrg,
 		logger:    logger,
 		parentCtx: ctx,
+		runner:    yacd.NewRunner(logger),
 	}
 
-	// Start pollers for all configured orgs
 	for _, orgCfg := range cfg.Orgs {
 		m.startOrg(orgCfg)
 	}
@@ -51,11 +55,15 @@ func (m *Manager) startOrg(orgCfg config.OrgConfig) {
 	p := poller.New(client, st, orgCfg.Organization, m.cfg.PollInterval, m.logger)
 	p.Start(ctx)
 
+	scanner := yacd.NewScanner(client.HTTPClient(), client.GraphQLURL(), m.logger)
+
 	m.instances[orgCfg.Name] = &OrgInstance{
-		Config: orgCfg,
-		Store:  st,
-		Poller: p,
-		Cancel: cancel,
+		Config:  orgCfg,
+		Client:  client,
+		Store:   st,
+		Poller:  p,
+		Scanner: scanner,
+		Cancel:  cancel,
 	}
 }
 
@@ -65,11 +73,35 @@ func (m *Manager) GetActiveStore() *store.Store {
 	if inst, ok := m.instances[m.activeOrg]; ok {
 		return inst.Store
 	}
-	// Fallback to first
 	for _, inst := range m.instances {
 		return inst.Store
 	}
 	return nil
+}
+
+func (m *Manager) GetActiveScanner() *yacd.Scanner {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if inst, ok := m.instances[m.activeOrg]; ok {
+		return inst.Scanner
+	}
+	for _, inst := range m.instances {
+		return inst.Scanner
+	}
+	return nil
+}
+
+func (m *Manager) GetActiveOrgConfig() *config.OrgConfig {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if inst, ok := m.instances[m.activeOrg]; ok {
+		return &inst.Config
+	}
+	return nil
+}
+
+func (m *Manager) Runner() *yacd.Runner {
+	return m.runner
 }
 
 func (m *Manager) GetActiveOrg() string {
@@ -87,7 +119,6 @@ func (m *Manager) SetActiveOrg(name string) bool {
 		m.cfg.Save()
 		return true
 	}
-	// Try matching by organization name
 	for key, inst := range m.instances {
 		if inst.Config.Organization == name {
 			m.activeOrg = key
